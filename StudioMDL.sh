@@ -1,98 +1,180 @@
 #!/bin/bash
+# WINE / Proton setup env
 export WINEPREFIX="$HOME/.wine64"
 export WINEARCH="win64"
 export WINEDEBUG="-all"
 
-export VPROJECT="/mnt/500GB/source1/0xdecompiled"
-export SteamLibrary="/mnt/500GB/SteamLibrary/steamapps/common"
+# default compile flags, and yeah I use all of then
 export CompileFlags="-verbose -printbones -fastbuild -fullcollide -collapsereport -dumpmaterials -nop4 -nox360 -n -h -parsecompletion $@"
 
+# nix paths
+export SteamLibrary="/mnt/500GB/SteamLibrary/steamapps/common"
+
+# this will be used as prefix for every QCProject
+export VPROJECT0="/mnt/500GB/source1/0xdecompiled"
+export qcprefix="Z:$VPROJECT0"
+
+# This set the StudioMDL -game flag
+export GMod="Z:$SteamLibrary/GarrysMod/garrysmod"
 export SFM="Z:$SteamLibrary/SourceFilmmaker/game/usermod"
+export L4D2="Z:$SteamLibrary/Left 4 Dead 2/left4dead2"
+
+# here the *nix path to the bin filder
+export GModbin="$SteamLibrary/GarrysMod/bin"
+export L4D2bin="$SteamLibrary/Left 4 Dead 2/bin"
 export SFMbin="$SteamLibrary/SourceFilmmaker/game/bin"
 
-export GMod="Z:$SteamLibrary/GarrysMod/garrysmod"
-export GModbin="$SteamLibrary/GarrysMod/bin"
+# here a special path for the l4d2 WINEPREFIX and avoid mess with our above WINEPREFIX
+export L4D2pfx="/mnt/500GB/SteamLibrary/steamapps/compatdata/563/pfx"
 
-export L4D2="Z:$SteamLibrary/Left 4 Dead 2/left4dead2"
-export L4D2bin="$SteamLibrary/Left 4 Dead 2/bin"
-export proton4="/home/loverenamon/.steam/steam/steamapps/common/Proton 4.11/dist/bin/wine" # para l4d2 que tem DRM
+# l4d2 had a throublesome authoring way, so we need set proton to enforce steam can see can use this StudioMDL. the "$@" is necessary to accept arguments
+proton4() {
+  $HOME/.steam/steam/steamapps/common/Proton\ 4.11/dist/bin/wine "$@"
+}
 
-export GAME=$GMod # Opção default
+# Uncomment if you have a special WINE environment, or even use Proton instaed, like we did with above Proton 4.11 
+#wine() {
+#    put here your custom wine path is you wanna use a specific version, example:
+#    /usr/bin/wine "$@"
+#    $HOME/.steam/steam/steamapps/common/Proton\ 5.0/dist/bin/wine "$@"
+#}
 
-cd $SFMbin
-title="\n\e[0;38;5;220mStudioMDL script para Source Engine. por: Davi (Debiddo) Gooz\e[0m\n"
-prompt="Selecione uma opção: jogo ou compilar: "
-options=("GMod" "SFM" "L4D2" "Compile")
-gamemsg="\nO jogo selecionado é agora é"
-compilemsg="Compilando para o relativo jogo em:\n\e[1;49;97m\"$GAME/models\"\e[0m\n"
+print_env() {
+  gamemsg="\nO Jogo selecionado é: \e[1;49;97m${1}\e[0m\n\nEnvironment modified to:\n\t\e[1;49;97mGAMEINFO:\e[0m $GAME\n\t\e[1;49;97mGAMEBIN:\e[0m $(pwd)\n\t\e[1;49;97mWINEPREFIX:\e[0m $WINEPREFIX\n\t\e[1;49;97mWINEARCH:\e[0m $WINEARCH\n"
+  compilemsg="Compiling for the previously selected gamemod at:\n\e[1;49;97m\"$GAME/models\"\e[0m\n"
+  echo -e ${gamemsg}
+}
 
-echo -e "\nStudioMDL rodando em \e[1;49;97m\"$WINEARCH\"\e[0m dentro do prefixo \e[1;49;97m\"$WINEPREFIX\"\e[0m\n
+set_wine_prefix() {
+  case "$1" in
+    w64) export WINEPREFIX=$WINE64;;
+    563) export WINEPREFIX="$L4D2pfx";;
+    help) echo -e "valid options: w64 | 563 | Any SteamID";;
+    *) export WINEPREFIX="${SteamLibrary::-7}/compatdata/$1/pfx";;
+  esac
+}
 
- Observações:
- 	 - Use arquivos de texto em .qc
- 	 - Não há necessidade de inserir a extensão do arquivo
- 	 - Evite usar espaços nos diretórios
- 	 - Insira o diretório relativo à:
-  \e[1;49;97m$VPROJECT0\e[0m
+set_custom_mod() {
+  read -e -p "WINEPREFIX: " pfx
+  read -e -p "GAMEBIN: " gamebin
+  read -e -p "GAMEINFO (where is your gameinfo.txt): " gameinfo
+  set_wine_prefix $pfx
+  cd "$gamebin"
+  export GAME="Z:$gameinfo"
+  print_env
+}
 
- Esse script roda em loop então poderá compilar inúmeros arquivos em sequência\n"
+# Default Option
+set_default() {
+  GAME=$GMod
+  cd $SFMbin
+  set_wine_prefix w64
+  print_env "Garry's Mod"
+}
+
+# gmod bin folder is a mess and their StudioMDL cant deal with higher density $lod, so we'll mix with SFM by default, change if you think it should be
+set_gmod() {
+  GAME=$GMod
+  set_wine_prefix w64
+  cd $GModbin
+  print_env "Garry's Mod"
+}
+
+set_sfm() {
+  GAME=$SFM
+  set_wine_prefix w64
+  cd $SFMbin
+  print_env "Source Filmmaker"
+}
+
+set_l4d2() {
+  GAME="$L4D2"
+  set_wine_prefix 563
+  cd "$L4D2bin"
+  print_env "Left 4 Dead 2"
+}
+
+do_compile() {
+  echo -e "$compilemsg"
+  read -p "QC: " qcfile
+  wine studiomdl $CompileFlags -game "$GAME" "$qcprefix/$qcfile"
+  echo -e $title
+}
+
+do_l4d2() {
+  cd "$L4D2bin"
+  echo -e "\nCompiling for \e[1;49;97mLeft 4 Dead 2\e[0m at:\n\e[1;49;97m\"$L4D2/models\"\e[0m\n"
+  print_env "Left 4 Dead 2"
+  read -e -p "QC: " qcfile
+  WINEPREFIX="$L4D2pfx" proton4 ./studiomdl.exe '-checklenghts -n -h -printbones -printgraph -nox360 -fastbuild -dumpmaterials -nop4 -verbose' "$@" -game "$L4D2" "$qcprefix/$qcfile"
+  echo -e "\n$title\n"
+}
+
+ajuda_ai_meu() {
+  echo -e "\n\tsorry I'm still working at this option\n"
+}
+
+title="\n\e[0;38;5;220mStudioMDL-helper para Source Engine.\n por: Davi (Debiddo) Gooz\e[0m\n"
+options=("Set Garry's Mod" "Set Source Filmmaker" "Set Left 4 Dead 2" "Compile a QC" "L4D2 Compile (dev)" "Reset Defaults" "Set Custom Environment" "Help")
+prompt="
+Select one of above options:
+"
+## Start the shit
+echo -e "\nStudioMDL running at \e[1;49;97m\"$WINEARCH\"\e[0m arch inside the \e[1;49;97m\"$WINEPREFIX\"\e[0m\n Wine Prefix
+
+ TIPs:
+ 	 - Insert bellow a .qc file
+ 	 - You don't need to write their extension
+ 	 - Avoid \"space\" usage
+ 	 - Insert your QC project relative to:  \e[1;49;97m$VPROJECT0\e[0m
+
+ This script run in loop so you'll be able to compile sequentially many files\n"
 echo -e "$title"
 
+set_default
+
+# Ask what should be done
 PS3="$prompt"
 select opt in "${options[@]}" "Quit"; do
     case "$REPLY" in
-    1) echo -e "$gamemsg \e[1;49;97m\Garry's Mod\e[0m"
-    export GAME=$GMod
-    cd $GModbin;echo;;
-    g*) echo -e "$gamemsg \e[1;49;97m\Garry's Mod"
-    export GAME=$GMod
-    cd $GModbin;echo;;
+      # Environments Setup
+      1*) set_gmod;;
+      g*) set_gmod;;
 
-    2) echo -e "$gamemsg \e[1;49;97m\Source Filmmaker\e[0m"
-    export GAME=$SFM
-    cd $SFMbin;echo;;
-    s*) echo -e "$gamemsg \e[1;49;97m\Source Filmmaker\e[0m"
-    export GAME=$SFM
-    cd $SFMbin;echo;;
+      2*) set_sfm;;
+      sf*) set_sfm;;
 
-    3) echo -e "$gamemsg \e[1;49;97m\Left 4 Dead 2\e[0m"
-    export GAME="$L4D2"
-    cd "$L4D2bin";
-    echo -e "\npara compilar, digite \e[1;49;97m\"lc\"\e[0m";;
-    l) echo -e "$gamemsg \e[1;49;97m\Left 4 Dead 2\e[0m"
-    export GAME="$L4D2"
-    cd "$L4D2bin";
-    echo -e "\npara compilar, digite \e[1;49;97m\"lc\"\e[0m";;
-    l4d*) echo -e "$gamemsg \e[1;49;97m\Left 4 Dead 2\e[0m"
-    export GAME="$L4D2"
-    cd "$L4D2bin";
-    echo -e "\npara compilar, digite \e[1;49;97m\"lc\"\e[0m";;
+      3*) set_l4d2;;
+      l) set_l4d2;;
+      l4d2) set_l4d2;;
 
-    # Compile part:
-    4) echo -e "$compilemsg"
-    read -p "QC: " qcfile
-    env wine studiomdl $CompileFlags -game "$GAME" "V:/0xdecompiled/$qcfile"
-    echo -e $title;;
-    c*) echo -e "$compilemsg"
-    read -p "QC: " qcfile
-    env wine studiomdl $CompileFlags -game "$GAME" "V:/0xdecompiled/$qcfile"
-    echo -e $title;;
-    m*) echo -e "$compilemsg"
-    read -p "QC: " qcfile
-    env wine studiomdl $CompileFlags -game "$GAME" "V:/0xdecompiled/$qcfile"
-    echo -e $title;;
+      # Compile part:
+      4*) do_compile;;
+      c*) do_compile;;
+      m*) do_compile;;
 
-    # Especial para l4d2
-    lc*) echo -e "\nCompilando especialmente para \e[1;49;97mLeft 4 Dead 2\e[0m em:\n\e[1;49;97m\"$GAME/models\"\e[0m\n"
-    read -e -p "QC: " qcfile
-    cd "$L4D2bin"
-    env WINEPREFIX=/mnt/500GB/SteamLibrary/steamapps/compatdata/563/pfx "$proton4" ./studiomdl.exe '-checklenghts -n -h -printbones -printgraph -nox360 -fastbuild -dumpmaterials -nop4 -verbose' "$@" -game "$L4D2" "V:/0xdecompiled/$qcfile"
-    echo -e "\n$title\n";;
+      # L4D2 Special
+      5*) do_l4d2;;
+      lc*) do_l4d2;;
+      l4d2c*) do_l4d2;;
 
-    $((${#options[@]}+1))) break;;
-    e*) break;;
-    q*) break;;
-    *) echo -e "\e[0;38;5;160mOpção inválida. Tente outra.\e[0m\n";
-    continue;;
+      # reset to Default Env
+      6*) set_default;;
+      def*) set_default;;
+
+      # set custom Env
+      7*) set_custom_mod;;
+      set) set_custom_mod;;
+
+      8*) ajuda_ai_meu;;
+      help) ajuda_ai_meu;;
+      ajuda) ajuda_ai_meu;;
+
+      $((${#options[@]}+1))) break;;
+      e*) break;;
+      q*) break;;
+
+      *) echo -e "\e[0;38;5;160mInvalid Option. Try again.\e[0m\n";
+      continue;;
     esac
 done
