@@ -12,7 +12,7 @@ export SteamLibrary="/mnt/500GB/SteamLibrary/steamapps/common"
 
 # this will be used as prefix for every QCProject
 export VPROJECT0="/mnt/500GB/source1/0xdecompiled"
-export qcprefix="Z:$VPROJECT0"
+export qcprefix="Z:${VPROJECT0}"
 
 # This set the StudioMDL -game flag
 export GMod="Z:$SteamLibrary/GarrysMod/garrysmod"
@@ -34,8 +34,7 @@ proton4() {
 
 # Uncomment if you have a special WINE environment, or even use Proton instaed, like we did with above Proton 4.11 
 #wine() {
-#    put here your custom wine path is you wanna use a specific version, example:
-#    /usr/bin/wine "$@"
+#    put here your custom wine path is you wanna use a specific version, examples:
 #    $HOME/.steam/steam/steamapps/common/Proton\ 5.0/dist/bin/wine "$@"
 #}
 
@@ -102,12 +101,11 @@ do_compile() {
 }
 
 do_l4d2() {
-  cd "$L4D2bin"
-  echo -e "\nCompiling for \e[1;49;97mLeft 4 Dead 2\e[0m at:\n\e[1;49;97m\"$L4D2/models\"\e[0m\n"
-  print_env "Left 4 Dead 2"
+  set_l4d2
+  echo -e "$compilemsg"
   read -e -p "QC: " qcfile
-  WINEPREFIX="$L4D2pfx" proton4 ./studiomdl.exe '-checklenghts -n -h -printbones -printgraph -nox360 -fastbuild -dumpmaterials -nop4 -verbose' "$@" -game "$L4D2" "$qcprefix/$qcfile"
-  echo -e "\n$title\n"
+  proton4 ./studiomdl.exe '-checklenghts -n -h -printbones -printgraph -nox360 -fastbuild -dumpmaterials -nop4 -verbose' "$@" -game "$GAME" "$qcprefix/$qcfile"
+  echo -e $title
 }
 
 ajuda_ai_meu() {
@@ -138,43 +136,29 @@ PS3="$prompt"
 select opt in "${options[@]}" "Quit"; do
     case "$REPLY" in
       # Environments Setup
-      1*) set_gmod;;
-      g*) set_gmod;;
-
-      2*) set_sfm;;
-      sf*) set_sfm;;
-
-      3*) set_l4d2;;
-      l) set_l4d2;;
-      l4d2) set_l4d2;;
+      1*|g*) set_gmod;;
+      2*|sf*) set_sfm;;
+      3*|l|l4d2) set_l4d2;;
 
       # Compile part:
-      4*) do_compile;;
-      c*) do_compile;;
-      m*) do_compile;;
+      4*|c*|m*) do_compile;;
 
       # L4D2 Special
-      5*) do_l4d2;;
-      lc*) do_l4d2;;
-      l4d2c*) do_l4d2;;
+      5*|lc|l4d2c) do_l4d2;;
 
       # reset to Default Env
-      6*) set_default;;
-      def*) set_default;;
+      6*|def*) set_default;;
 
       # set custom Env
-      7*) set_custom_mod;;
-      set) set_custom_mod;;
+      7*|set) set_custom_mod;;
 
-      8*) ajuda_ai_meu;;
-      help) ajuda_ai_meu;;
-      ajuda) ajuda_ai_meu;;
+      # Help
+      8*|help|ajuda) ajuda_ai_meu;;
 
-      $((${#options[@]}+1))) break;;
-      e*) break;;
-      q*) break;;
+      # Quit
+      $((${#options[@]}+1))|e*|q*) break;;
 
-      *) echo -e "\e[0;38;5;160mInvalid Option. Try again.\e[0m\n";
-      continue;;
+      # Non valid option
+      *) echo -e "\e[0;38;5;160mInvalid Option. Try again.\e[0m\n"; continue;;
     esac
 done
